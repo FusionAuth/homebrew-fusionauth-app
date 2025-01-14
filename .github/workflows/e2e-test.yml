@@ -1,0 +1,133 @@
+# This workflow performs a full End 2 End test of the App
+# It runs the test on the last 5 iOS releases.
+
+name: E2E Test with latest FusionAuth
+
+on:
+  # Triggers the workflow on pull request events but only for default and protected branches
+  pull_request:
+    branches: [ "main" ]
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "e2e-test"
+  e2e-test:
+    name: End 2 End Test
+
+    permissions:
+      # required for all workflows
+      security-events: write
+      # only required for workflows in private repositories
+      actions: read
+      contents: read
+
+    # The type of runner that the job will run on
+    # https://xcodereleases.com/
+    # https://developer.apple.com/support/xcode/
+    # https://developer.apple.com/documentation/xcode-release-notes
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ "macos-14", "macos-13" ]
+        postgresql-version: [ "14", "15", "16" ]
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checkout the repository.
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      # Install FusionAuth with brew.
+      - name: Install PostgreSQL
+        run: brew install postgresql@${{ matrix.postgresql-version }} -v
+          
+      # Start PostgreSQL with brew.
+      - name: Start PostgreSQL
+        run: brew services start postgresql@${{ matrix.postgresql-version }} -v
+          
+      # Add PostgreSQL to the PATH.
+      - name: Add PostgreSQL to the PATH
+        run: echo "$(brew --prefix postgresql@${{matrix.postgresql-version }})/bin" >> $GITHUB_PATH
+
+      # Add PostgreSQL fusionauth user with default password.
+      - name: Add PostgreSQL fusionauth user
+        run: psql --command="CREATE USER fusionauth PASSWORD 'fusionauth'" --command="\du" postgres
+          
+      # Add PostgreSQL fusionauth database.
+      - name: Add PostgreSQL fusionauth database
+        run: createdb --owner=fusionauth fusionauth
+
+      # Install FusionAuth App with brew.
+      - name: Install FusionAuth App
+        run: brew install --formula ./Formula/fusionauth-app.rb -v
+
+      # Configure FusionAuth App with silent mode.
+      - name: Configure FusionAuth App
+        run: |
+          echo "" >> $(brew --prefix)/etc/fusionauth/fusionauth.properties
+          echo "fusionauth-app.kickstart.file=$(echo $GITHUB_WORKSPACE)/kickstart/kickstart.json" >> $(brew --prefix)/etc/fusionauth/fusionauth.properties
+          echo "fusionauth-app.silent-mode=true" >> $(brew --prefix)/etc/fusionauth/fusionauth.properties
+          cat $(brew --prefix)/etc/fusionauth/fusionauth.properties
+
+      # Start FusionAuth App.
+      - name: Start FusionAuth App
+        run: brew services start fusionauth-app -v
+
+      # Check Brew services status.
+      - name: Check Brew services status
+        run: brew services list
+
+      # Check FusionAuth status 10 times with increasing wait times
+      # Continue if FusionAuth status is OK or fail at the end.
+      - name: Check FusionAuth status
+        run: |
+          for i in {1..10}; do
+            if curl -s http://localhost:9011/api/status | grep -qi "ok"; then
+              echo "FusionAuth is up and running."
+              exit 0
+            else
+              echo "FusionAuth is not up and running. Waiting for $(expr 10 \* $i) seconds."
+              sleep $(expr 10 \* $i)
+            fi
+          done
+          cat $(brew --prefix)/var/log/fusionauth/fusionauth-app.log
+          exit 1
+
+      # Check KickstartRunner execution 10 times with increasing wait times
+      # Continue if KickstartRunner execution is OK or fail at the end.
+      # TODO - use webhook instead https://fusionauth.io/docs/extend/events-and-webhooks/events/kickstart-success
+      - name: Check KickstartRunner execution
+        run: |
+          for i in {1..10}; do
+            if cat $(brew --prefix)/var/log/fusionauth/fusionauth-app.log | grep "KickstartRunner" | grep -q "Summary"; then
+              echo "KickstartRunner execution is OK."
+              exit 0
+            else
+              echo "KickstartRunner execution is not OK. Waiting for $(expr 10 \* $i) seconds."
+              sleep $(expr 10 \* $i)
+            fi
+          done
+          cat $(brew --prefix)/var/log/fusionauth/fusionauth-app.log
+          exit 1
+
+      # Read FusionAuth App logs.
+      - name: Read FusionAuth App logs
+        run: cat $(brew --prefix)/var/log/fusionauth/fusionauth-app.log
+
+      # Connect to FusionAuth App.
+      - name: Connect to FusionAuth App
+        run: curl http://localhost:9011/api/status
+
+      # Perform E2E test.
+      # tbd
+
+      # Stop FusionAuth App.
+      - name: Stop FusionAuth App
+        run: brew services stop fusionauth-app -v
+
+      # Stop PostgreSQL.
+      - name: Stop PostgreSQL
+        run: brew services stop postgresql@${{ matrix.postgresql-version }} -v

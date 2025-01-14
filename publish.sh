@@ -21,8 +21,6 @@
 # Download sha256 sum files
 rm -f fusionauth-app-${1}.zip.sha256
 wget --no-verbose "https://files.fusionauth.io/products/fusionauth/${1}/fusionauth-app-${1}.zip.sha256"
-rm -f fusionauth-search-${1}.zip.sha256
-wget --no-verbose "https://files.fusionauth.io/products/fusionauth/${1}/fusionauth-search-${1}.zip.sha256"
 
 # - Note that this generally will run on a build server running GNU. If you run on macOS which is BSD, the behavior of sed differs when using -i.
 #   See: https://stackoverflow.com/questions/29904928/sed-adding-e-suffixed-file-when-used-in-osx
@@ -34,17 +32,12 @@ wget --no-verbose "https://files.fusionauth.io/products/fusionauth/${1}/fusionau
 
 # Update URL
 sed -i -E "s/fusionauth\/(.*)\/fusionauth-app-(.*).zip\"$/fusionauth\/${1}\/fusionauth-app-${1}.zip\"/" ./Formula/fusionauth-app.rb
-sed -i -E "s/fusionauth\/(.*)\/fusionauth-search-(.*).zip\"$/fusionauth\/${1}\/fusionauth-search-${1}.zip\"/" ./Formula/fusionauth-search.rb
 
 # Update SHA 256 sum
 sum=`cat ./fusionauth-app-${1}.zip.sha256|awk -F" " '{print $1}'`
 sed -i -E "s/sha256 \"(.*)\"$/sha256 \"${sum}\"/" ./Formula/fusionauth-app.rb
 
-sum=`cat ./fusionauth-search-${1}.zip.sha256|awk -F" " '{print $1}'`
-sed -i -E "s/sha256 \"(.*)\"$/sha256 \"${sum}\"/" ./Formula/fusionauth-search.rb
-
 rm fusionauth-app-${1}.zip.sha256
-rm fusionauth-search-${1}.zip.sha256
 
 git add .
 git commit -m"release ${1}"

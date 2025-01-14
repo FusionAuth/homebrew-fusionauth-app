@@ -5,21 +5,18 @@ Easy installation of FusionAuth via Homebrew.
 
 Simply install and start the services. Then navigate to http://localhost:9011 and follow the setup prompts.
 
-The following examples assume you will be installing both `fusionauth-app` and `fusionauth-search`.
-If you have access to another instance of Elasticsearch that meets the minimum requirement, you may omit the `fusionauth-search` service.
-
+The following examples assume you will be installing `fusionauth-app`.
 
 ## Install
 
 ```bash
 brew tap fusionauth/fusionauth
-brew install fusionauth-app fusionauth-search
+brew install fusionauth-app
 ```
 
 ## Start
 
 ```bash
-brew services start fusionauth-search
 brew services start fusionauth-app
 ```
 
@@ -27,7 +24,6 @@ brew services start fusionauth-app
 
 ```bash
 brew upgrade fusionauth-app
-brew upgrade fusionauth-search
 ```
 
 ## Config
@@ -35,6 +31,18 @@ brew upgrade fusionauth-search
 Logs: `/usr/local/var/log/fusionauth/`
 Config file: `/usr/local/etc/fusionauth/fusionauth.properties`
 
+## Test
+If fusionauth is already installed via homebrew, you need to uninstall it.
+    
+```bash
+brew uninstall fusionauth-app
+```
+
+Then to test that this works, run the following command from this diretory:
+
+```bash
+brew install ./Formula/fusionauth-app.rb
+```
 
 ## Release
 
